@@ -1,9 +1,7 @@
 ﻿# TreinTopografieNL
 
 
-Use in CLI:
-
-install:
+To install:
 ---
 ```pip install uv```
 
@@ -19,7 +17,7 @@ install:
 
 **Make map to test the students:**
 
-```python .\script_to_make_overhoormap.py --output_folder "path/to/output_folder" --versions 5 --ic 10 --spr 10```
+```python .\script_to_make_exammap.py --output_folder "path/to/output_folder" --versions 5 --ic 10 --spr 10```
 
 --versions:
 
@@ -36,7 +34,7 @@ The number of SPR stations that will be put on the test. Default: 5
 ---
 
 
-backlog:
-- clean this code up
+Backlog:
+- Clean this code up (it be messy)
 - Better names for scripts
 - Make sure the IC stations are really IC stations (or find a different source)

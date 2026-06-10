@@ -7,4 +7,4 @@ OTHERSTATIONS = "#400c0c"
 BLUE = "#00024a"
 GREEN = "#034a22"
 WHITE = "#ffffff"
-
+BROWN = "#7A6248"

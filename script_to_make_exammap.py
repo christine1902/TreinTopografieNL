@@ -1,75 +1,75 @@
 #!/usr/bin/env python3
-import io
 import os
-import zipfile
 import argparse
 
-import geopandas as gpd
 import matplotlib.pyplot as plt
 import matplotlib.patheffects as pe
 import numpy as np
-import requests
 import pandas as pd
 from matplotlib.lines import Line2D
 from colours import *
 from input_files import *
+from helpers import *
+from trainstation_types import *
 
 
 def get_sample(url, ic, sp):
     df = pd.read_csv(url)
     df = df[["name_long", "type"]]
-    intercity_types = ["sneltreinstation", "knooppuntSneltreinstation", "knooppuntIntercitystation", "intercitystation", "megastation"]
     intercities = df[df["type"].isin(intercity_types)]
 
     intercites_sample = intercities.sample(ic)
-    sprinter_types = ["stoptreinstation", "knooppuntStoptreinstation", "facultatiefStation"]
     sprinters = df[df["type"].isin(sprinter_types)]
     sprinters_sample = sprinters.sample(sp)
-
 
     df_totaal = pd.concat([intercites_sample, sprinters_sample])
     return df_totaal["name_long"]
 
 
-def load_admin_borders() -> gpd.GeoDataFrame:
-    """Download GADM level-1 province boundaries for the Netherlands."""
-    print("  Downloading province borders …")
-    r = requests.get(GADM_URL, timeout=120)
-    r.raise_for_status()
-    gdf = gpd.read_file(io.BytesIO(r.content))
-    return gdf.to_crs(epsg=28992)
-
-def download_geojson(url: str) -> gpd.GeoDataFrame:
-    """Download a zipped GeoJSON from HDX and return as GeoDataFrame."""
-    print(f"  Downloading {url.split('/')[-1]} …")
-    r = requests.get(url, timeout=120)
-    r.raise_for_status()
-    with zipfile.ZipFile(io.BytesIO(r.content)) as z:
-        geojson_name = next(n for n in z.namelist() if n.endswith(".geojson"))
-        with z.open(geojson_name) as f:
-            gdf = gpd.read_file(f)
-    print(f"    → {len(gdf)} features loaded")
-    return gdf
-
-def make(versie, output_file, output_file_legend, lines_main, stations, ostations, provinces, ic_sample_size, spr_sample_size):
+def make_files(
+    versie,
+    output_file,
+    output_file_legend,
+    lines_main,
+    stations,
+    ostations,
+    provinces,
+    ic_sample_size,
+    spr_sample_size,
+):
     print(f"making version {versie}")
     # Give (ic_sample_size+spr_sample_size) random stations a sequential number
-    
-    overhoor_stations = ostations[ostations["Naam"].isin(get_sample(INTERCITY, ic=ic_sample_size, sp=spr_sample_size))]
-    while len(overhoor_stations) < (ic_sample_size+spr_sample_size):
-        overhoor_stations = pd.concat([overhoor_stations, ostations[ostations["Naam"].isin(get_sample(INTERCITY, ic=ic_sample_size, sp=spr_sample_size))]])
-        overhoor_stations = overhoor_stations.drop_duplicates(subset="Naam", keep="first")
-        if len(overhoor_stations) > (ic_sample_size+spr_sample_size):
-            overhoor_stations = overhoor_stations.head(ic_sample_size+spr_sample_size)
+
+    overhoor_stations = ostations[
+        ostations["Naam"].isin(
+            get_sample(INTERCITY, ic=ic_sample_size, sp=spr_sample_size)
+        )
+    ]
+    while len(overhoor_stations) < (ic_sample_size + spr_sample_size):
+        overhoor_stations = pd.concat(
+            [
+                overhoor_stations,
+                ostations[
+                    ostations["Naam"].isin(
+                        get_sample(INTERCITY, ic=ic_sample_size, sp=spr_sample_size)
+                    )
+                ],
+            ]
+        )
+        overhoor_stations = overhoor_stations.drop_duplicates(
+            subset="Naam", keep="first"
+        )
+        if len(overhoor_stations) > (ic_sample_size + spr_sample_size):
+            overhoor_stations = overhoor_stations.head(ic_sample_size + spr_sample_size)
 
     overhoor_stations = overhoor_stations.reset_index(drop=True)
     overhoor_stations["map_number"] = overhoor_stations.index + 1
-    print(f"  {len(lines_main)} main-line segments, {len(stations)} stations, {len(overhoor_stations)} overhoorstations")
+    print(f" {len(stations)} stations, {len(overhoor_stations)} overhoorstations")
     country = provinces.dissolve()  # union of all provinces = country outline
 
     # ── 3. Reproject to Dutch RD New (EPSG:28992) ─────────────────────────────
-    lines_main  = lines_main.to_crs(epsg=28992)
-    stations    = stations.to_crs(epsg=28992)
+    lines_main = lines_main.to_crs(epsg=28992)
+    stations = stations.to_crs(epsg=28992)
 
     # ── 4. Build the figure ───────────────────────────────────────────────────
     # Vintage palette
@@ -98,7 +98,7 @@ def make(versie, output_file, output_file_legend, lines_main, stations, ostation
     provinces.plot(
         ax=ax_map,
         facecolor="none",
-        edgecolor="#7A6248",  # warm brown, matches the parchment palette
+        edgecolor=BROWN,  # warm brown, matches the parchment palette
         linewidth=0.6,
         linestyle="--",
         zorder=1,
@@ -120,13 +120,27 @@ def make(versie, output_file, output_file_legend, lines_main, stations, ostation
                 continue
             if geom.geom_type == "LineString":
                 xs, ys = geom.xy
-                ax_map.plot(xs, ys, color=color, lw=lw, ls=ls,
-                            solid_capstyle="round", zorder=zorder)
+                ax_map.plot(
+                    xs,
+                    ys,
+                    color=color,
+                    lw=lw,
+                    ls=ls,
+                    solid_capstyle="round",
+                    zorder=zorder,
+                )
             elif geom.geom_type == "MultiLineString":
                 for part in geom.geoms:
                     xs, ys = part.xy
-                    ax_map.plot(xs, ys, color=color, lw=lw, ls=ls,
-                                solid_capstyle="round", zorder=zorder)
+                    ax_map.plot(
+                        xs,
+                        ys,
+                        color=color,
+                        lw=lw,
+                        ls=ls,
+                        solid_capstyle="round",
+                        zorder=zorder,
+                    )
 
     # Shadow / halo for the main lines (gives a printed-map look)
     plot_lines(lines_main, "#C4A882", lw=3, zorder=2, label=None)
@@ -134,23 +148,35 @@ def make(versie, output_file, output_file_legend, lines_main, stations, ostation
 
     # ── 4c. Draw stations ─────────────────────────────────────────────────────
     for _, row in overhoor_stations.iterrows():
-        #plot the not questioned stations AFTER the questioned stations, to get the map less confusing when overlapping
+        # plot the not questioned stations AFTER the questioned stations, to get the map less confusing when overlapping
         x, y = row.geometry.x, row.geometry.y
-        num  = row["map_number"]
+        num = row["map_number"]
 
         # Dot
-        ax_map.plot(x, y, "o", color=PARCHMENT, markersize=18,
-                    markeredgecolor=ACCENT, markeredgewidth=1.3, zorder=5)
+        ax_map.plot(
+            x,
+            y,
+            "o",
+            color=PARCHMENT,
+            markersize=18,
+            markeredgecolor=ACCENT,
+            markeredgewidth=1.3,
+            zorder=5,
+        )
 
         # Number label with halo
         txt = ax_map.text(
-            x, y, str(num),
-            ha="center", va="center",
-            fontsize=12, fontweight="bold", color=ACCENT, zorder=6,
+            x,
+            y,
+            str(num),
+            ha="center",
+            va="center",
+            fontsize=12,
+            fontweight="bold",
+            color=ACCENT,
+            zorder=6,
         )
-        txt.set_path_effects([
-            pe.withStroke(linewidth=1, foreground=PARCHMENT)
-        ])
+        txt.set_path_effects([pe.withStroke(linewidth=1, foreground=PARCHMENT)])
 
     for _, row in stations.iterrows():
         if row["Naam"] in list(overhoor_stations["Naam"]):
@@ -158,9 +184,16 @@ def make(versie, output_file, output_file_legend, lines_main, stations, ostation
         x, y = row.geometry.x, row.geometry.y
 
         # Dot
-        ax_map.plot(x, y, "o", color=PARCHMENT, markersize=5,
-                    markeredgecolor=OTHERSTATIONS, markeredgewidth=1, zorder=7)
-
+        ax_map.plot(
+            x,
+            y,
+            "o",
+            color=PARCHMENT,
+            markersize=5,
+            markeredgecolor=OTHERSTATIONS,
+            markeredgewidth=1,
+            zorder=7,
+        )
 
     # ── 4d. Map decoration ────────────────────────────────────────────────────
     ax_map.set_aspect("equal")
@@ -174,43 +207,64 @@ def make(versie, output_file, output_file_legend, lines_main, stations, ostation
     ar_x = xmax + pad_x * 0.5
     ar_y = ymin + (ymax - ymin) * 0.08
     ax_map.annotate(
-        "", xy=(ar_x, ar_y + (ymax - ymin) * 0.04),
+        "",
+        xy=(ar_x, ar_y + (ymax - ymin) * 0.04),
         xytext=(ar_x, ar_y),
         arrowprops=dict(arrowstyle="-|>", color=INK, lw=1.2),
         zorder=7,
     )
-    ax_map.text(ar_x, ar_y + (ymax - ymin) * 0.046, "N",
-                ha="center", va="bottom", fontsize=9,
-                fontweight="bold", color=INK, zorder=7)
+    ax_map.text(
+        ar_x,
+        ar_y + (ymax - ymin) * 0.046,
+        "N",
+        ha="center",
+        va="bottom",
+        fontsize=9,
+        fontweight="bold",
+        color=INK,
+        zorder=7,
+    )
 
     # ── 4e. Title ─────────────────────────────────────────────────────────────
 
     fig.text(
-        0.50, 0.97,
+        0.50,
+        0.97,
         "SPOORWEGEN DER NEDERLANDEN",
-        ha="center", va="top",
-        fontsize=26, fontweight="bold",
+        ha="center",
+        va="top",
+        fontsize=26,
+        fontweight="bold",
         color=INK,
         fontfamily="garamond",
     )
     fig.text(
-        0.50, 0.945,
+        0.50,
+        0.945,
         f"EXAM VERSION: {versie}",
-        ha="center", va="top",
-        fontsize=20, color=INK, fontfamily="garamond",
+        ha="center",
+        va="top",
+        fontsize=20,
+        color=INK,
+        fontfamily="garamond",
     )
 
     # ── 5. Legend panel ───────────────────────────────────────────────────────
     COLS = 2
-    col_w = 0.5                     # fraction of legend width per column
-    row_h = 0.018                   # fraction of figure height per row
-    top   = 0.94                    # start y in axes-fraction
+    col_w = 0.5  # fraction of legend width per column
+    row_h = 0.018  # fraction of figure height per row
 
     ax_leg.text(
-        0.5, 0.97, f"ANTWOORDEN {versie}",
-        ha="center", va="top",
+        0.5,
+        0.97,
+        f"ANSWERS VERSION: {versie}",
+        ha="center",
+        va="top",
         transform=ax_leg.transAxes,
-        fontsize=11, fontweight="bold", color=INK, fontfamily="serif",
+        fontsize=11,
+        fontweight="bold",
+        color=INK,
+        fontfamily="serif",
     )
 
     # Sort stations for the legend
@@ -224,9 +278,8 @@ def make(versie, output_file, output_file_legend, lines_main, stations, ostation
         .replace("", "(unnamed)")
     )
 
-    legend_stations["name_cleaner"] = (
-        legend_stations["name_clean"]
-        .apply(lambda x: split_name(x))
+    legend_stations["name_cleaner"] = legend_stations["name_clean"].apply(
+        lambda x: split_name(x)
     )
     legend_stations = legend_stations.sort_values("map_number")
 
@@ -241,10 +294,13 @@ def make(versie, output_file, output_file_legend, lines_main, stations, ostation
         y = 0.935 - r * row_h * (0.935 / (rows_per_col * row_h + 0.01))
 
         ax_leg.text(
-            x, y,
+            x,
+            y,
             f"{row['map_number']:>3}. {row['name_cleaner']}",
             transform=ax_leg.transAxes,
-            fontsize=font_size, color=INK, fontfamily="monospace",
+            fontsize=font_size,
+            color=INK,
+            fontfamily="monospace",
             va="top",
         )
 
@@ -252,8 +308,16 @@ def make(versie, output_file, output_file_legend, lines_main, stations, ostation
     legend_y = 0.04
     legend_elements = [
         Line2D([0], [0], color=RAIL_MAIN, lw=2, label="Rail"),
-        Line2D([0], [0], marker="o", color="w", markerfacecolor=WHITE,
-               markeredgecolor=ACCENT, markersize=7, label="Station"),
+        Line2D(
+            [0],
+            [0],
+            marker="o",
+            color="w",
+            markerfacecolor=WHITE,
+            markeredgecolor=ACCENT,
+            markersize=7,
+            label="Station",
+        ),
     ]
     ax_map.legend(
         handles=legend_elements,
@@ -296,12 +360,14 @@ def make(versie, output_file, output_file_legend, lines_main, stations, ostation
     print(f"Done → {os.path.abspath(output_file_legend)}")
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--output_folder', required=True, action='store')
-    parser.add_argument('--versions', required=False, action='store', type=int, default=3)
-    parser.add_argument( '--ic', required=False, action='store', type=int, default=15)
-    parser.add_argument( '--spr', required=False, action='store', type=int, default=5)
+    parser.add_argument("--output_folder", required=True, action="store")
+    parser.add_argument(
+        "--versions", required=False, action="store", type=int, default=3
+    )
+    parser.add_argument("--ic", required=False, action="store", type=int, default=15)
+    parser.add_argument("--spr", required=False, action="store", type=int, default=5)
     args = parser.parse_args()
     output_folder = args.output_folder
 
@@ -329,22 +395,27 @@ if __name__ == "__main__":
     stations = stations.dropna(subset=["geometry"])
 
     # clean those names up
-    def split_name(name):
-        return name.split(",")[0]
     overhoor_stations = stations.copy()
-    overhoor_stations["Naam"] = (
-        overhoor_stations["Naam"]
-        .apply(lambda x: split_name(x))
-    )
-    stations["Naam"] = (
-        stations["Naam"]
-        .apply(lambda x: split_name(x))
-    )
+    overhoor_stations["Naam"] = overhoor_stations["Naam"].apply(lambda x: split_name(x))
+    stations["Naam"] = stations["Naam"].apply(lambda x: split_name(x))
 
     provinces = load_admin_borders()
 
     for versie in versies:
         output_file = os.path.join(output_folder, f"{versie}_overhoring.jpg")
         output_file_legend = os.path.join(output_folder, f"{versie}_antwoorden.jpg")
-        make(versie, output_file, output_file_legend, lines_main, stations, overhoor_stations, provinces, ic_sample_size, spr_sample_size)
+        make_files(
+            versie,
+            output_file,
+            output_file_legend,
+            lines_main,
+            stations,
+            overhoor_stations,
+            provinces,
+            ic_sample_size,
+            spr_sample_size,
+        )
 
+
+if __name__ == "__main__":
+    main()
