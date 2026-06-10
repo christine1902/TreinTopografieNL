@@ -5,8 +5,8 @@ Use in CLI:
 
 install:
 ---
-pip install uv
-uv pip install requests geopandas matplotlib shapely pillow numpy folium
+```pip install uv```
+```uv pip install requests geopandas matplotlib shapely pillow numpy folium```
 
 ---
 **Make map for students to study:**
