@@ -6,6 +6,7 @@ Use in CLI:
 install:
 ---
 ```pip install uv```
+
 ```uv pip install requests geopandas matplotlib shapely pillow numpy folium```
 
 ---
@@ -18,7 +19,7 @@ install:
 
 **Make map to test the students:**
 
-```python .\script_to_make_overhoormap.py --output_folder "path/to/output_folder" --versions 5```
+```python .\script_to_make_overhoormap.py --output_folder "path/to/output_folder" --versions 5 --ic 10 --spr 10```
 
 --versions:
 
@@ -37,4 +38,5 @@ The number of SPR stations that will be put on the test. Default: 5
 
 backlog:
 - clean this code up
-- make sure the IC stations are really IC stations (or find a different source)
+- Better names for scripts
+- Make sure the IC stations are really IC stations (or find a different source)
