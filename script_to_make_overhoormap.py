@@ -151,8 +151,8 @@ def make(versie, output_file, output_file_legend, lines_main, stations, ostation
         num  = row["map_number"]
 
         # Dot
-        ax_map.plot(x, y, "o", color=PARCHMENT, markersize=13,
-                    markeredgecolor=ACCENT, markeredgewidth=1.3, zorder=6)
+        ax_map.plot(x, y, "o", color=PARCHMENT, markersize=15,
+                    markeredgecolor=ACCENT, markeredgewidth=1.3, zorder=5)
 
         # Number label with halo
         txt = ax_map.text(
@@ -165,11 +165,13 @@ def make(versie, output_file, output_file_legend, lines_main, stations, ostation
         ])
 
     for _, row in stations.iterrows():
+        if row["Naam"] in list(overhoor_stations["Naam"]):
+            continue
         x, y = row.geometry.x, row.geometry.y
 
         # Dot
         ax_map.plot(x, y, "o", color=PARCHMENT, markersize=5,
-                    markeredgecolor=OTHERSTATIONS, markeredgewidth=1, zorder=4)
+                    markeredgecolor=OTHERSTATIONS, markeredgewidth=1, zorder=7)
 
 
     # ── 4d. Map decoration ────────────────────────────────────────────────────
@@ -344,6 +346,10 @@ if __name__ == "__main__":
     overhoor_stations = stations.copy()
     overhoor_stations["Naam"] = (
         overhoor_stations["Naam"]
+        .apply(lambda x: split_name(x))
+    )
+    stations["Naam"] = (
+        stations["Naam"]
         .apply(lambda x: split_name(x))
     )
 
