@@ -361,7 +361,7 @@ if __name__ == "__main__":
     parser.add_argument('-o', '--output_file', required=True, action='store')
     args = parser.parse_args()
     output_file = args.output_file
-    if not output_file.endswith(".jpeg") or not output_file.endswith(".jpg"):
+    if not output_file.endswith(".jpeg") and not output_file.endswith(".jpg"):
         output_file = output_file + ".jpg"
     make(output_file)
 
