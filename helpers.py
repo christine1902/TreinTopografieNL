@@ -1,6 +1,7 @@
 import requests
 import geopandas as gpd
 import zipfile
+import io
 
 
 def load_admin_borders(GADM_URL) -> gpd.GeoDataFrame:

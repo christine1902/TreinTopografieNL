@@ -399,11 +399,11 @@ def main():
     overhoor_stations["Naam"] = overhoor_stations["Naam"].apply(lambda x: split_name(x))
     stations["Naam"] = stations["Naam"].apply(lambda x: split_name(x))
 
-    provinces = load_admin_borders()
+    provinces = load_admin_borders(GADM_URL)
 
     for versie in versies:
-        output_file = os.path.join(output_folder, f"{versie}_overhoring.jpg")
-        output_file_legend = os.path.join(output_folder, f"{versie}_antwoorden.jpg")
+        output_file = os.path.join(output_folder, f"{versie}_exam.jpg")
+        output_file_legend = os.path.join(output_folder, f"{versie}_answers.jpg")
         make_files(
             versie,
             output_file,

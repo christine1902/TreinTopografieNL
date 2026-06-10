@@ -250,22 +250,22 @@ def make_file(output_file):
     # ── 4e. Title ─────────────────────────────────────────────────────────────
     fig.text(
         0.35,
-        0.97,
+        0.90,
         "SPOORWEGEN DER NEDERLANDEN",
         ha="center",
         va="top",
-        fontsize=18,
+        fontsize=55,
         fontweight="bold",
         color=INK,
         fontfamily="garamond",
     )
     fig.text(
         0.35,
-        0.945,
+        0.845,
         "Dutch Railway Network",
         ha="center",
         va="top",
-        fontsize=8,
+        fontsize=30,
         color=INK,
         fontstyle="italic",
         fontfamily="garamond",
