@@ -1,17 +1,4 @@
 #!/usr/bin/env python3
-"""
-Netherlands Railway Map Generator
-===================================
-Downloads OpenStreetMap railway data from the Humanitarian Data Exchange,
-then renders an old-school cartographic JPG with:
-  - Railway lines drawn in a vintage style
-  - Stations numbered on the map
-  - A legend listing station names
-
-Requirements:
-    pip install requests geopandas matplotlib shapely pillow numpy
-"""
-
 import io
 import os
 import zipfile
@@ -24,11 +11,8 @@ import numpy as np
 import requests
 import pandas as pd
 from matplotlib.lines import Line2D
-
-INPUT_FILE = "sourcefiles/railways.geojson.txt"
-INPUT_OV_FILE = "sourcefiles/OV_HALTES_NL_ACTUEEL.json"
-INTERCITY = "sourcefiles/stations-2023-09-nl.csv"
-GADM_URL = "https://geodata.ucdavis.edu/gadm/gadm4.1/json/gadm41_NLD_1.json"
+from colours import *
+from input_files import *
 
 def get_intercities(url):
     df = pd.read_csv(url)
@@ -112,17 +96,8 @@ def make(output_file):
     stations    = stations.to_crs(epsg=28992)
 
     # ── 4. Build the figure ───────────────────────────────────────────────────
-    # Vintage palette
-    PARCHMENT  = "#F2E8D0"
-    INK        = "#2B1B0E"
-    RAIL_MAIN  = "#5C3A1E"
-    ACCENT     = "#8B1A1A"
-    GRID_COLOR = "#C8B89A"
-    OTHERSTATIONS = "#400c0c"
-    BLUE = "#00024a"
-    GREEN = "#034a22"
 
-    fig = plt.figure(figsize=(16, 20), facecolor=PARCHMENT)
+    fig = plt.figure(figsize=(21, 30), facecolor=PARCHMENT)
 
     # Map area (left ~70 % of width)
     ax_map = fig.add_axes([0.02, 0.06, 0.66, 0.88], facecolor=PARCHMENT)
@@ -252,32 +227,31 @@ def make(output_file):
         ha="center", va="top",
         fontsize=18, fontweight="bold",
         color=INK,
-        fontfamily="serif",
+        fontfamily="garamond",
     )
     fig.text(
         0.35, 0.945,
-        "Railway Network",
+        "Dutch Railway Network",
         ha="center", va="top",
-        fontsize=8, color=INK, fontstyle="italic", fontfamily="serif",
+        fontsize=8, color=INK, fontstyle="italic", fontfamily="garamond",
     )
 
     # ── 5. Legend panel ───────────────────────────────────────────────────────
     COLS = 2
     col_w = 0.5                     # fraction of legend width per column
     row_h = 0.018                   # fraction of figure height per row
-    top   = 0.94                    # start y in axes-fraction
 
     ax_leg.text(
         0.5, 0.97, "STATIONSLIJST",
         ha="center", va="top",
         transform=ax_leg.transAxes,
-        fontsize=11, fontweight="bold", color=INK, fontfamily="serif",
+        fontsize=11, fontweight="bold", color=INK, fontfamily="garamond",
     )
     ax_leg.text(
         0.5, 0.955, "Index of Stations",
         ha="center", va="top",
         transform=ax_leg.transAxes,
-        fontsize=7, color=INK, fontstyle="italic", fontfamily="serif",
+        fontsize=7, color=INK, fontstyle="italic", fontfamily="garamond",
     )
 
     # Divider line
@@ -323,9 +297,11 @@ def make(output_file):
     legend_elements = [
         Line2D([0], [0], color=RAIL_MAIN, lw=2, label="Rail"),
         Line2D([0], [0], marker="o", color="w", markerfacecolor=PARCHMENT,
-               markeredgecolor=ACCENT, markersize=7, label="Station"),
+               markeredgecolor=GREEN, markersize=7, label="Sprinter Station"),
+        Line2D([0], [0], marker="o", color="w", markerfacecolor=PARCHMENT,
+               markeredgecolor=BLUE, markersize=7, label="Intercity Station"),
     ]
-    ax_leg.legend(
+    ax_map.legend(
         handles=legend_elements,
         loc="lower center",
         bbox_to_anchor=(0.5, 0.0),

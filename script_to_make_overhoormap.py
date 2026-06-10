@@ -11,12 +11,8 @@ import numpy as np
 import requests
 import pandas as pd
 from matplotlib.lines import Line2D
-
-# ── Download URLs (HDX / HOTOSM Netherlands Railways) ─────────────────────────
-INPUT_FILE = "sourcefiles/railways.geojson.txt"
-INPUT_OV_FILE = "sourcefiles/OV_HALTES_NL_ACTUEEL.json"
-GADM_URL = "https://geodata.ucdavis.edu/gadm/gadm4.1/json/gadm41_NLD_1.json"
-INTERCITY = "sourcefiles/stations-2023-09-nl.csv"
+from colours import *
+from input_files import *
 
 
 def get_sample(url, ic, sp):
@@ -77,18 +73,10 @@ def make(versie, output_file, output_file_legend, lines_main, stations, ostation
 
     # ── 4. Build the figure ───────────────────────────────────────────────────
     # Vintage palette
-    WHITE = "#ffffff"
-    PARCHMENT  = "#F2E8D0"
-    INK        = "#2B1B0E"
-    RAIL_MAIN  = "#5C3A1E"
-    ACCENT     = "#8B1A1A"
-    GRID_COLOR = "#C8B89A"
-    OTHERSTATIONS = "#400c0c"
+    fig = plt.figure(figsize=(21, 30), facecolor=WHITE)
+    figL = plt.figure(figsize=(4.2, 6), facecolor=WHITE)
 
-    fig = plt.figure(figsize=(16, 20), facecolor=WHITE)
-    figL = plt.figure(figsize=(4, 5), facecolor=WHITE)
-
-    ax_map = fig.add_axes([0.02, 0.06, 0.88, 0.88], facecolor=WHITE)
+    ax_map = fig.add_axes([0.02, 0.06, 0.94, 0.94], facecolor=WHITE)
 
     # Legend area (right panel)
     ax_leg = figL.add_axes([0.02, 0.06, 0.88, 0.88], facecolor=WHITE)
@@ -151,7 +139,7 @@ def make(versie, output_file, output_file_legend, lines_main, stations, ostation
         num  = row["map_number"]
 
         # Dot
-        ax_map.plot(x, y, "o", color=PARCHMENT, markersize=15,
+        ax_map.plot(x, y, "o", color=PARCHMENT, markersize=18,
                     markeredgecolor=ACCENT, markeredgewidth=1.3, zorder=5)
 
         # Number label with halo
@@ -198,18 +186,18 @@ def make(versie, output_file, output_file_legend, lines_main, stations, ostation
     # ── 4e. Title ─────────────────────────────────────────────────────────────
 
     fig.text(
-        0.35, 0.97,
-        f"SPOORWEGEN DER NEDERLANDEN versie {versie}",
+        0.50, 0.97,
+        "SPOORWEGEN DER NEDERLANDEN",
         ha="center", va="top",
-        fontsize=18, fontweight="bold",
+        fontsize=26, fontweight="bold",
         color=INK,
-        fontfamily="serif",
+        fontfamily="garamond",
     )
     fig.text(
-        0.35, 0.945,
-        "Railway Network",
+        0.50, 0.945,
+        f"EXAM VERSION: {versie}",
         ha="center", va="top",
-        fontsize=8, color=INK, fontstyle="italic", fontfamily="serif",
+        fontsize=20, color=INK, fontfamily="garamond",
     )
 
     # ── 5. Legend panel ───────────────────────────────────────────────────────
