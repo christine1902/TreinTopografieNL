@@ -15,6 +15,7 @@ Requirements:
 import io
 import os
 import zipfile
+import argparse
 
 import geopandas as gpd
 import matplotlib.pyplot as plt
@@ -22,16 +23,12 @@ import matplotlib.patheffects as pe
 import numpy as np
 import requests
 import pandas as pd
-from matplotlib.patches import FancyBboxPatch
 from matplotlib.lines import Line2D
 
-# ── Download URLs (HDX / HOTOSM Netherlands Railways) ─────────────────────────
-INPUT_FILE = r"C:\Users\chris\Documents\railways.geojson.txt"
-INPUT_OV_FILE = r"C:\Users\chris\Documents\OV_HALTES_NL_ACTUEEL.json"
-OUTPUT_FILE = "netherlands_railway_map_learn.jpg"
-
+INPUT_FILE = "sourcefiles/railways.geojson.txt"
+INPUT_OV_FILE = "sourcefiles/OV_HALTES_NL_ACTUEEL.json"
+INTERCITY = "sourcefiles/stations-2023-09-nl.csv"
 GADM_URL = "https://geodata.ucdavis.edu/gadm/gadm4.1/json/gadm41_NLD_1.json"
-INTERCITY = r"C:\Users\chris\Documents\stations-2023-09-nl.csv"
 
 def get_intercities(url):
     df = pd.read_csv(url)
@@ -69,7 +66,7 @@ def download_geojson(url: str) -> gpd.GeoDataFrame:
     return gdf
 
 
-def main():
+def make(output_file):
     # ── 1. Fetch data ──────────────────────────────────────────────────────────
     print("Fetching data …")
     gdf = gpd.read_file(INPUT_FILE)
@@ -347,18 +344,24 @@ def main():
         spine.set_linewidth(1)
 
     # ── 6. Save ───────────────────────────────────────────────────────────────
-    print(f"Saving {OUTPUT_FILE} …")
+    print(f"Saving {output_file} …")
     fig.savefig(
-        OUTPUT_FILE,
+        output_file,
         format="jpeg",
         dpi=200,
         bbox_inches="tight",
         pil_kwargs={"quality": 92},
     )
     plt.close(fig)
-    print(f"Done → {os.path.abspath(OUTPUT_FILE)}")
+    print(f"Done → {os.path.abspath(output_file)}")
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-o', '--output_file', required=True, action='store')
+    args = parser.parse_args()
+    output_file = args.output_file
+    if not output_file.endswith(".jpeg") or not output_file.endswith(".jpg"):
+        output_file = output_file + ".jpg"
+    make(output_file)
 

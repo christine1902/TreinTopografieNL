@@ -1,21 +1,8 @@
 #!/usr/bin/env python3
-"""
-Netherlands Railway Map Generator
-===================================
-Downloads OpenStreetMap railway data from the Humanitarian Data Exchange,
-then renders an old-school cartographic JPG with:
-  - Railway lines drawn in a vintage style
-  - Stations numbered on the map
-  - A legend listing station names
-
-Requirements:
-    pip install requests geopandas matplotlib shapely pillow numpy
-"""
-
 import io
 import os
 import zipfile
-import random
+import argparse
 
 import geopandas as gpd
 import matplotlib.pyplot as plt
@@ -23,18 +10,14 @@ import matplotlib.patheffects as pe
 import numpy as np
 import requests
 import pandas as pd
-from matplotlib.patches import FancyBboxPatch
 from matplotlib.lines import Line2D
 
 # ── Download URLs (HDX / HOTOSM Netherlands Railways) ─────────────────────────
 INPUT_FILE = "sourcefiles/railways.geojson.txt"
 INPUT_OV_FILE = "sourcefiles/OV_HALTES_NL_ACTUEEL.json"
 GADM_URL = "https://geodata.ucdavis.edu/gadm/gadm4.1/json/gadm41_NLD_1.json"
-INTERCITY = "stations-2023-09-nl.csv"
+INTERCITY = "sourcefiles/stations-2023-09-nl.csv"
 
-IC_SAMPLE_SIZE = 15
-SP_SAMPLE_SIZE = 5
-OUTPUT_FOLDER = "netherlands_railway_map_overhoorsel"
 
 def get_sample(url, ic, sp):
     df = pd.read_csv(url)
@@ -72,16 +55,16 @@ def download_geojson(url: str) -> gpd.GeoDataFrame:
     print(f"    → {len(gdf)} features loaded")
     return gdf
 
-def make(versie, output_file, output_file_legend, lines_main, stations, ostations, provinces):
+def make(versie, output_file, output_file_legend, lines_main, stations, ostations, provinces, ic_sample_size, spr_sample_size):
     print(f"making version {versie}")
-    # Give (IC_SAMPLE_SIZE+SP_SAMPLE_SIZE) random stations a sequential number
+    # Give (ic_sample_size+spr_sample_size) random stations a sequential number
     
-    overhoor_stations = ostations[ostations["Naam"].isin(get_sample(INTERCITY, ic=IC_SAMPLE_SIZE, sp=SP_SAMPLE_SIZE))]
-    while len(overhoor_stations) < (IC_SAMPLE_SIZE+SP_SAMPLE_SIZE):
-        overhoor_stations = pd.concat([overhoor_stations, ostations[ostations["Naam"].isin(get_sample(INTERCITY, ic=IC_SAMPLE_SIZE, sp=SP_SAMPLE_SIZE))]])
+    overhoor_stations = ostations[ostations["Naam"].isin(get_sample(INTERCITY, ic=ic_sample_size, sp=spr_sample_size))]
+    while len(overhoor_stations) < (ic_sample_size+spr_sample_size):
+        overhoor_stations = pd.concat([overhoor_stations, ostations[ostations["Naam"].isin(get_sample(INTERCITY, ic=ic_sample_size, sp=spr_sample_size))]])
         overhoor_stations = overhoor_stations.drop_duplicates(subset="Naam", keep="first")
-        if len(overhoor_stations) > (IC_SAMPLE_SIZE+SP_SAMPLE_SIZE):
-            overhoor_stations = overhoor_stations.head(IC_SAMPLE_SIZE+SP_SAMPLE_SIZE)
+        if len(overhoor_stations) > (ic_sample_size+spr_sample_size):
+            overhoor_stations = overhoor_stations.head(ic_sample_size+spr_sample_size)
 
     overhoor_stations = overhoor_stations.reset_index(drop=True)
     overhoor_stations["map_number"] = overhoor_stations.index + 1
@@ -324,13 +307,27 @@ def make(versie, output_file, output_file_legend, lines_main, stations, ostation
 
 
 if __name__ == "__main__":
-    versies = ["A", "B", "C"]
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--output_folder', required=True, action='store')
+    parser.add_argument('--versions', required=False, action='store', type=int, default=3)
+    parser.add_argument( '--ic', required=False, action='store', type=int, default=15)
+    parser.add_argument( '--spr', required=False, action='store', type=int, default=5)
+    args = parser.parse_args()
+    output_folder = args.output_folder
+
+    versions = args.versions
+    if versions > 26:
+        versions = 26
+    ic_sample_size = args.ic
+    spr_sample_size = args.spr
+
+    versies = [x for x in "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[:versions]]
 
     gdf = gpd.read_file(INPUT_FILE)
     lines_gdf = gdf[gdf.geometry.geom_type.isin({"LineString", "MultiLineString"})]
     stations_gdf = gpd.read_file(INPUT_OV_FILE)
-    if not os.path.isdir(OUTPUT_FOLDER):
-        os.mkdir(OUTPUT_FOLDER)
+    if not os.path.isdir(output_folder):
+        os.mkdir(output_folder)
 
     MAIN_TYPES = {"rail"}
     lines_main = lines_gdf[lines_gdf["railway"].isin(MAIN_TYPES)].copy()
@@ -353,7 +350,7 @@ if __name__ == "__main__":
     provinces = load_admin_borders()
 
     for versie in versies:
-        output_file = os.path.join(OUTPUT_FOLDER, f"{versie}_overhoring.jpg")
-        output_file_legend = os.path.join(OUTPUT_FOLDER, f"{versie}_antwoorden.jpg")
-        make(versie, output_file, output_file_legend, lines_main, stations, overhoor_stations, provinces)
+        output_file = os.path.join(output_folder, f"{versie}_overhoring.jpg")
+        output_file_legend = os.path.join(output_folder, f"{versie}_antwoorden.jpg")
+        make(versie, output_file, output_file_legend, lines_main, stations, overhoor_stations, provinces, ic_sample_size, spr_sample_size)
 
