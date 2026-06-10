@@ -36,8 +36,5 @@ The number of SPR stations that will be put on the test. Default: 5
 
 
 backlog:
-- make script more flexible (un-hardcode jpg-locations, un-hardcode values above, etc)
-- clean this shit up
-
-was getekend,
-Christine
+- clean this code up
+- make sure the IC stations are really IC stations (or find a different source)
