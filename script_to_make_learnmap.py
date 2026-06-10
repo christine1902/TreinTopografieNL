@@ -1,72 +1,33 @@
 #!/usr/bin/env python3
-"""
-Netherlands Railway Map Generator
-===================================
-Downloads OpenStreetMap railway data from the Humanitarian Data Exchange,
-then renders an old-school cartographic JPG with:
-  - Railway lines drawn in a vintage style
-  - Stations numbered on the map
-  - A legend listing station names
-
-Requirements:
-    pip install requests geopandas matplotlib shapely pillow numpy
-"""
-
-import io
 import os
-import zipfile
 import argparse
 
-import geopandas as gpd
 import matplotlib.pyplot as plt
 import matplotlib.patheffects as pe
 import numpy as np
-import requests
 import pandas as pd
 from matplotlib.lines import Line2D
+from colours import *
+from input_files import *
+from helpers import *
+from trainstation_types import *
 
-INPUT_FILE = "sourcefiles/railways.geojson.txt"
-INPUT_OV_FILE = "sourcefiles/OV_HALTES_NL_ACTUEEL.json"
-INTERCITY = "sourcefiles/stations-2023-09-nl.csv"
-GADM_URL = "https://geodata.ucdavis.edu/gadm/gadm4.1/json/gadm41_NLD_1.json"
 
 def get_intercities(url):
     df = pd.read_csv(url)
     df = df[["name_long", "type"]]
-    intercity_types = ["sneltreinstation", "knooppuntSneltreinstation", "knooppuntIntercitystation", "intercitystation", "megastation"]
     intercities = df[df["type"].isin(intercity_types)]
     return intercities["name_long"]
+
 
 def get_sprinters(url):
     df = pd.read_csv(url)
     df = df[["name_long", "type"]]
-    sprinter_types = ["stoptreinstation", "knooppuntStoptreinstation", "facultatiefStation"]
     sprinters = df[df["type"].isin(sprinter_types)]
     return sprinters["name_long"]
 
 
-def load_admin_borders() -> gpd.GeoDataFrame:
-    """Download GADM level-1 province boundaries for the Netherlands."""
-    print("  Downloading province borders …")
-    r = requests.get(GADM_URL, timeout=120)
-    r.raise_for_status()
-    gdf = gpd.read_file(io.BytesIO(r.content))
-    return gdf.to_crs(epsg=28992)
-
-def download_geojson(url: str) -> gpd.GeoDataFrame:
-    """Download a zipped GeoJSON from HDX and return as GeoDataFrame."""
-    print(f"  Downloading {url.split('/')[-1]} …")
-    r = requests.get(url, timeout=120)
-    r.raise_for_status()
-    with zipfile.ZipFile(io.BytesIO(r.content)) as z:
-        geojson_name = next(n for n in z.namelist() if n.endswith(".geojson"))
-        with z.open(geojson_name) as f:
-            gdf = gpd.read_file(f)
-    print(f"    → {len(gdf)} features loaded")
-    return gdf
-
-
-def make(output_file):
+def make_file(output_file):
     # ── 1. Fetch data ──────────────────────────────────────────────────────────
     print("Fetching data …")
     gdf = gpd.read_file(INPUT_FILE)
@@ -87,42 +48,28 @@ def make(output_file):
 
     # Give 25 random stations a sequential number
 
-    def split_name(name):
-        return name.split(",")[0]
-
     stations_2 = stations.copy()
-    stations_2["Naam"] = (
-        stations_2["Naam"]
-        .apply(lambda x: split_name(x))
-    )
+    stations_2["Naam"] = stations_2["Naam"].apply(lambda x: split_name(x))
     stations_2 = stations_2.reset_index(drop=True)
     stations_2["map_number"] = stations_2.index + 1
-
 
     intercity_stations = stations_2[stations_2["Naam"].isin(get_intercities(INTERCITY))]
 
     sprinter_stations = stations_2[stations_2["Naam"].isin(get_sprinters(INTERCITY))]
 
-    print(f"  {len(lines_main)} main-line segments, {len(intercity_stations)} IC stations, {len(sprinter_stations)} SPR stations")
-    provinces = load_admin_borders()
+    print(
+        f"  {len(lines_main)} main-line segments, {len(intercity_stations)} IC stations, {len(sprinter_stations)} SPR stations"
+    )
+    provinces = load_admin_borders(GADM_URL)
     country = provinces.dissolve()  # union of all provinces = country outline
 
     # ── 3. Reproject to Dutch RD New (EPSG:28992) ─────────────────────────────
-    lines_main  = lines_main.to_crs(epsg=28992)
-    stations    = stations.to_crs(epsg=28992)
+    lines_main = lines_main.to_crs(epsg=28992)
+    stations = stations.to_crs(epsg=28992)
 
     # ── 4. Build the figure ───────────────────────────────────────────────────
-    # Vintage palette
-    PARCHMENT  = "#F2E8D0"
-    INK        = "#2B1B0E"
-    RAIL_MAIN  = "#5C3A1E"
-    ACCENT     = "#8B1A1A"
-    GRID_COLOR = "#C8B89A"
-    OTHERSTATIONS = "#400c0c"
-    BLUE = "#00024a"
-    GREEN = "#034a22"
 
-    fig = plt.figure(figsize=(16, 20), facecolor=PARCHMENT)
+    fig = plt.figure(figsize=(21, 30), facecolor=PARCHMENT)
 
     # Map area (left ~70 % of width)
     ax_map = fig.add_axes([0.02, 0.06, 0.66, 0.88], facecolor=PARCHMENT)
@@ -147,7 +94,7 @@ def make(output_file):
     provinces.plot(
         ax=ax_map,
         facecolor="none",
-        edgecolor="#7A6248",  # warm brown, matches the parchment palette
+        edgecolor=BROWN,
         linewidth=0.6,
         linestyle="--",
         zorder=1,
@@ -157,7 +104,7 @@ def make(output_file):
     country.plot(
         ax=ax_map,
         facecolor="none",
-        edgecolor=INK,  # dark ink, strong outer border
+        edgecolor=INK,
         linewidth=1.8,
         zorder=1,
     )
@@ -169,13 +116,27 @@ def make(output_file):
                 continue
             if geom.geom_type == "LineString":
                 xs, ys = geom.xy
-                ax_map.plot(xs, ys, color=color, lw=lw, ls=ls,
-                            solid_capstyle="round", zorder=zorder)
+                ax_map.plot(
+                    xs,
+                    ys,
+                    color=color,
+                    lw=lw,
+                    ls=ls,
+                    solid_capstyle="round",
+                    zorder=zorder,
+                )
             elif geom.geom_type == "MultiLineString":
                 for part in geom.geoms:
                     xs, ys = part.xy
-                    ax_map.plot(xs, ys, color=color, lw=lw, ls=ls,
-                                solid_capstyle="round", zorder=zorder)
+                    ax_map.plot(
+                        xs,
+                        ys,
+                        color=color,
+                        lw=lw,
+                        ls=ls,
+                        solid_capstyle="round",
+                        zorder=zorder,
+                    )
 
     # Shadow / halo for the main lines (gives a printed-map look)
     plot_lines(lines_main, "#C4A882", lw=3.2, zorder=2, label=None)
@@ -186,43 +147,75 @@ def make(output_file):
         x, y = row.geometry.x, row.geometry.y
 
         # Dot
-        ax_map.plot(x, y, "o", color=PARCHMENT, markersize=3,
-                    markeredgecolor=OTHERSTATIONS, markeredgewidth=1, zorder=4)
+        ax_map.plot(
+            x,
+            y,
+            "o",
+            color=PARCHMENT,
+            markersize=3,
+            markeredgecolor=OTHERSTATIONS,
+            markeredgewidth=1,
+            zorder=4,
+        )
 
     for _, row in intercity_stations.iterrows():
         x, y = row.geometry.x, row.geometry.y
-        num  = row["map_number"]
+        num = row["map_number"]
 
         # Dot
-        ax_map.plot(x, y, "o", color=BLUE, markersize=7,
-                    markeredgecolor=BLUE, markeredgewidth=1.2, zorder=5)
+        ax_map.plot(
+            x,
+            y,
+            "o",
+            color=BLUE,
+            markersize=7,
+            markeredgecolor=BLUE,
+            markeredgewidth=1.2,
+            zorder=5,
+        )
 
         # Number label with halo
         txt = ax_map.text(
-            x, y, str(num),
-            ha="center", va="center",
-            fontsize=4.5, fontweight="bold", color=BLUE, zorder=6,
+            x,
+            y,
+            str(num),
+            ha="center",
+            va="center",
+            fontsize=4.5,
+            fontweight="bold",
+            color=BLUE,
+            zorder=6,
         )
-        txt.set_path_effects([
-            pe.withStroke(linewidth=1.5, foreground=PARCHMENT)
-        ])
+        txt.set_path_effects([pe.withStroke(linewidth=1.5, foreground=PARCHMENT)])
     for _, row in sprinter_stations.iterrows():
         x, y = row.geometry.x, row.geometry.y
-        num  = row["map_number"]
+        num = row["map_number"]
 
         # Dot
-        ax_map.plot(x, y, "o", color=GREEN, markersize=5,
-                    markeredgecolor=GREEN, markeredgewidth=1.1, zorder=4)
+        ax_map.plot(
+            x,
+            y,
+            "o",
+            color=GREEN,
+            markersize=5,
+            markeredgecolor=GREEN,
+            markeredgewidth=1.1,
+            zorder=4,
+        )
 
         # Number label with halo
         txt = ax_map.text(
-            x, y, str(num),
-            ha="center", va="center",
-            fontsize=4.5, fontweight="bold", color=GREEN, zorder=6,
+            x,
+            y,
+            str(num),
+            ha="center",
+            va="center",
+            fontsize=4.5,
+            fontweight="bold",
+            color=GREEN,
+            zorder=6,
         )
-        txt.set_path_effects([
-            pe.withStroke(linewidth=1.5, foreground=PARCHMENT)
-        ])
+        txt.set_path_effects([pe.withStroke(linewidth=1.5, foreground=PARCHMENT)])
 
     # ── 4d. Map decoration ────────────────────────────────────────────────────
     ax_map.set_aspect("equal")
@@ -236,48 +229,76 @@ def make(output_file):
     ar_x = xmax + pad_x * 0.5
     ar_y = ymin + (ymax - ymin) * 0.08
     ax_map.annotate(
-        "", xy=(ar_x, ar_y + (ymax - ymin) * 0.04),
+        "",
+        xy=(ar_x, ar_y + (ymax - ymin) * 0.04),
         xytext=(ar_x, ar_y),
         arrowprops=dict(arrowstyle="-|>", color=INK, lw=1.2),
         zorder=7,
     )
-    ax_map.text(ar_x, ar_y + (ymax - ymin) * 0.046, "N",
-                ha="center", va="bottom", fontsize=9,
-                fontweight="bold", color=INK, zorder=7)
+    ax_map.text(
+        ar_x,
+        ar_y + (ymax - ymin) * 0.046,
+        "N",
+        ha="center",
+        va="bottom",
+        fontsize=9,
+        fontweight="bold",
+        color=INK,
+        zorder=7,
+    )
 
     # ── 4e. Title ─────────────────────────────────────────────────────────────
     fig.text(
-        0.35, 0.97,
+        0.35,
+        0.90,
         "SPOORWEGEN DER NEDERLANDEN",
-        ha="center", va="top",
-        fontsize=18, fontweight="bold",
+        ha="center",
+        va="top",
+        fontsize=55,
+        fontweight="bold",
         color=INK,
-        fontfamily="serif",
+        fontfamily="garamond",
     )
     fig.text(
-        0.35, 0.945,
-        "Railway Network",
-        ha="center", va="top",
-        fontsize=8, color=INK, fontstyle="italic", fontfamily="serif",
+        0.35,
+        0.845,
+        "Dutch Railway Network",
+        ha="center",
+        va="top",
+        fontsize=30,
+        color=INK,
+        fontstyle="italic",
+        fontfamily="garamond",
     )
 
     # ── 5. Legend panel ───────────────────────────────────────────────────────
     COLS = 2
-    col_w = 0.5                     # fraction of legend width per column
-    row_h = 0.018                   # fraction of figure height per row
-    top   = 0.94                    # start y in axes-fraction
+    col_w = 0.5  # fraction of legend width per column
+    row_h = 0.018  # fraction of figure height per row
 
     ax_leg.text(
-        0.5, 0.97, "STATIONSLIJST",
-        ha="center", va="top",
+        0.5,
+        0.97,
+        "STATIONSLIJST",
+        ha="center",
+        va="top",
         transform=ax_leg.transAxes,
-        fontsize=11, fontweight="bold", color=INK, fontfamily="serif",
+        fontsize=11,
+        fontweight="bold",
+        color=INK,
+        fontfamily="garamond",
     )
     ax_leg.text(
-        0.5, 0.955, "Index of Stations",
-        ha="center", va="top",
+        0.5,
+        0.955,
+        "Index of Stations",
+        ha="center",
+        va="top",
         transform=ax_leg.transAxes,
-        fontsize=7, color=INK, fontstyle="italic", fontfamily="serif",
+        fontsize=7,
+        color=INK,
+        fontstyle="italic",
+        fontfamily="garamond",
     )
 
     # Divider line
@@ -294,9 +315,8 @@ def make(output_file):
         .replace("", "(unnamed)")
     )
 
-    legend_stations["name_cleaner"] = (
-        legend_stations["name_clean"]
-        .apply(lambda x: split_name(x))
+    legend_stations["name_cleaner"] = legend_stations["name_clean"].apply(
+        lambda x: split_name(x)
     )
     legend_stations = legend_stations.sort_values("map_number")
 
@@ -311,10 +331,13 @@ def make(output_file):
         y = 0.935 - r * row_h * (0.935 / (rows_per_col * row_h + 0.01))
 
         ax_leg.text(
-            x, y,
+            x,
+            y,
             f"{row['map_number']:>3}. {row['name_cleaner']}",
             transform=ax_leg.transAxes,
-            fontsize=font_size, color=INK, fontfamily="monospace",
+            fontsize=font_size,
+            color=INK,
+            fontfamily="monospace",
             va="top",
         )
 
@@ -322,10 +345,28 @@ def make(output_file):
     legend_y = 0.04
     legend_elements = [
         Line2D([0], [0], color=RAIL_MAIN, lw=2, label="Rail"),
-        Line2D([0], [0], marker="o", color="w", markerfacecolor=PARCHMENT,
-               markeredgecolor=ACCENT, markersize=7, label="Station"),
+        Line2D(
+            [0],
+            [0],
+            marker="o",
+            color="w",
+            markerfacecolor=PARCHMENT,
+            markeredgecolor=GREEN,
+            markersize=7,
+            label="Sprinter Station",
+        ),
+        Line2D(
+            [0],
+            [0],
+            marker="o",
+            color="w",
+            markerfacecolor=PARCHMENT,
+            markeredgecolor=BLUE,
+            markersize=7,
+            label="Intercity Station",
+        ),
     ]
-    ax_leg.legend(
+    ax_map.legend(
         handles=legend_elements,
         loc="lower center",
         bbox_to_anchor=(0.5, 0.0),
@@ -358,10 +399,9 @@ def make(output_file):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-o', '--output_file', required=True, action='store')
+    parser.add_argument("-o", "--output_file", required=True, action="store")
     args = parser.parse_args()
     output_file = args.output_file
     if not output_file.endswith(".jpeg") and not output_file.endswith(".jpg"):
         output_file = output_file + ".jpg"
-    make(output_file)
-
+    make_file(output_file)
